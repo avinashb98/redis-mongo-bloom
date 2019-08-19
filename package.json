@@ -17,6 +17,7 @@
   },
   "homepage": "https://github.com/avinashb98/redis-mongo-bloom#readme",
   "dependencies": {
+    "@albert-team/rebloom": "^2.0.0-canary.0",
     "mongoose": "^5.6.9"
   },
   "devDependencies": {
