@@ -1,31 +1,38 @@
-const http = require('http');
+const readline = require('readline');
 const mongo = require('./config/db');
 const User = require('./user');
+const BloomFilter = require('./userbloom');
+// const ids = require('./ids.json');
+
+const MAX_TESTS = 100000;
+const UPPER_LIMIT = 6999999999999999;
+const LOWER_LIMIT = 6000000000000000;
+const getRandomUserId = () => Math.floor(
+    (Math.random() * (UPPER_LIMIT - LOWER_LIMIT)) + LOWER_LIMIT
+);
 
 (async () => {
     await mongo.connect();
-})();
+    await BloomFilter.connect();
+    console.log('Filter Connected: userbloom');
 
-function requestResponseHandler(request, response) {
-    if (request.url.includes('isAuthor')) {
-        const urlParts = request.url.split('/');
-        const userId = Number.parseInt(urlParts[urlParts.length - 1], 10);
-        User.exists({ userId })
-            .then((exists) => {
-                response.writeHead(500, { 'Content-Type': 'application/json' });
-                response.write(JSON.stringify({ userId, exists }));
-                response.end();
-            })
-            .catch((err) => {
-                console.log(err);
-                response.writeHead(500, { 'Content-Type': 'application/json' });
-                response.write(JSON.stringify({ message: 'Something Went Wrong' }));
-                response.end();
-            });
+    let negatives = 0;
+    let falsePostitives = 0;
+    for (let i = 0; i < MAX_TESTS; i += 1) {
+        readline.clearLine(process.stdout);
+        readline.cursorTo(process.stdout, 0);
+        process.stdout.write(`Checking for : ${i + 1} / ${MAX_TESTS}`);
+        const userId = getRandomUserId();
+        const existsInFilter = await BloomFilter.exists(userId);
+        if (!existsInFilter) {
+            negatives += 1;
+        } else {
+            const existsInDb = await User.exists({ userId });
+            if (!existsInDb) falsePostitives += 1;
+        }
     }
-}
+    console.log('\n');
 
-const httpServer = http.createServer(requestResponseHandler);
-httpServer.listen(3000, () => {
-    console.log('Server is listening on port 3000');
-});
+    console.log({ negatives, falsePostitives });
+    console.log(`Error: ${((falsePostitives / MAX_TESTS) * 100).toFixed(4)}`);
+})();
